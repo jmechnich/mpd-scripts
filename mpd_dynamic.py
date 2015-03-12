@@ -1,30 +1,82 @@
 #!/usr/bin/env python
 
-import argparse, atexit, audioscrobbler, mpd, random, socket, urllib
+import argparse, atexit, audioscrobbler, mpd, random, re, socket, urllib
 
-def add_random_track(mpd_instance, artists, args):
-    tracks = mpd_instance.find('Artist', random.choice(artists))
-    track  = random.choice(tracks)
-    if args.verbose:
-        print "add_random_track: '%s - %s'" % (
-            track['artist'], track['title'])
-    mpd_instance.add(track['file'])
-
-def fill_random(mpd_instance, artists, args):
-    status = mpd_instance.status()
+def songs_remaining(mpd_instance):
+    status    = mpd_instance.status()
     pl_length = int(status['playlistlength'])
     song      = int(status.get('song',0))
-    remaining = pl_length - song
-    add       = args.length - remaining
+    return (pl_length - song)
+
+def filter_track(track,args):
+    rejected = False
+    if args.filter:
+        for f in args.filter:
+            sep   = f.find(',')
+            tag   = f[:sep]
+            regex = f[sep+1:]
+            if track.has_key(tag):
+                if re.match(track[tag],regex):
+                    rejected = True
+                    if args.verbose:
+                        print "filter_track: '%s - %s' rejected by filter '%s'" % (track['artist'], track['title'], f)
+                    break
+    return rejected
+
+def add_random_track(mpd_instance, files, args):
+    while len(files):
+        fileentry = random.choice(files)
+        uri       = fileentry['file']
+        track     = mpd_instance.listallinfo(uri)[0]
+        files.remove(fileentry)
+        if filter_track(track,args):
+            continue
+        if args.verbose:
+            print "add_random_track: '%s - %s'" % (
+                track['artist'], track['title'])
+        mpd_instance.add(uri)
+        break
+    else:
+        if args.verbose:
+            print "add_random_track: no songs left"
+
+def fill_random(mpd_instance, files, args):
+    add = args.length - songs_remaining(mpd_instance)
     if add > 0:
         if args.verbose:
             print "fill_random: adding", add, "random tracks"
         for i in xrange(add):
-            add_random_track(mpd_instance,artists,args)
+            add_random_track(mpd_instance,files,args)
     else:
         if args.verbose:
             print "fill_random: nothing to do"
     
+def add_random_track_from_artists(mpd_instance, artists, args):
+    while xrange(10):
+        tracks = mpd_instance.find('Artist', random.choice(artists))
+        track  = random.choice(tracks)
+        if filter_track(track,args):
+            continue
+        if args.verbose:
+            print "add_random_track_from_artists: '%s - %s'" % (
+                track['artist'], track['title'])
+        mpd_instance.add(track['file'])
+        break
+    else:
+        if args.verbose:
+            print "add_random_track_from_artists: max retries reached"
+
+def fill_random_from_artists(mpd_instance, artists, args):
+    add = args.length - songs_remaining(mpd_instance)
+    if add > 0:
+        if args.verbose:
+            print "fill_random_from_artists: adding", add, "random tracks"
+        for i in xrange(add):
+            add_random_track_from_artists(mpd_instance,artists,args)
+    else:
+        if args.verbose:
+            print "fill_random_from_artists: nothing to do"
+
 def fill_similar(mpd_instance, artists, args):
     current = mpd_instance.currentsong()
     if not len(current):
@@ -41,7 +93,7 @@ def fill_similar(mpd_instance, artists, args):
     similar_cloud = [ str(artist.name).decode('utf-8')
                       for artist in cloud.similar() ]
     if len(similar_cloud) == 0:
-        add_random_track(mpd_instance,artists,args)
+        add_random_track_from_artists(mpd_instance,artists,args)
         return
     
     similar_artists = list(set(similar_cloud).intersection(artists))
@@ -49,20 +101,40 @@ def fill_similar(mpd_instance, artists, args):
         print "fill_similar: %d/%d similar artists found" % (
             len(similar_artists), len(similar_cloud))
     if len(similar_artists) == 0:
-        add_random_track(mpd_instance,artists,args)
+        add_random_track_from_artists(mpd_instance,artists,args)
         return
 
-    add_random_track(mpd_instance,similar_artists,args)
+    add_random_track_from_artists(mpd_instance,similar_artists,args)
 
 fill_similar.last = ''
     
+def init_baselist(mpd_instance, args):
+    if args.verbose:
+        print "init_baselist:",
+    if args.mode == 'random':
+        ret = [ f for f in mpd_instance.listall() if f.has_key('file') ]
+        print "found", len(ret), "files"
+    else:
+        ret = mpd_instance.list('Artist')
+        print "found", len(ret), "artists"
+    return ret
+
 def main():
     modemap = { 'random':  fill_random,
+                'random2': fill_random_from_artists,
                 'similar': fill_similar
     }
     parser = argparse.ArgumentParser(
         prog='mpd_dynamic',
-        description="mpd_dynamic - fill playlist dynamically")
+        description="mpd_dynamic - fill playlist dynamically",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Available operation modes are:
+  - random: real random playback, randomly selects track from all available files and removes it from list
+  - random2: pseudo-random playback, randomly selects an artist, then a random track by this artist
+  - similar: finds similar artists on last.fm and adds a random song by one of them
+""",
+    )
     parser.add_argument(
         'host', type=str, nargs="?", default='localhost',
         help='hostname of MPD server (default: %(default)s)')
@@ -73,12 +145,14 @@ def main():
         '-l', '--length', type=int, default=20,
         help='number of remaining songs (default: %(default)s)')
     parser.add_argument(
-        '-m', '--mode', choices=modemap.keys(), default='random',
+        '-m', '--mode', choices=sorted(modemap.keys()), default='random',
         help="operation mode (default: %(default)s)")
+    parser.add_argument(
+        '-f', '--filter', type=str, action='append',
+        help="reject song candidates by tag-regex matching. Can be given multiple times. Format: TAG,REGEX (e.g. 'genre,Audiobook')")
     parser.add_argument(
         '-v', '--verbose', help='verbose output', action="store_true")
     args = parser.parse_args()
-    
     m = mpd.MPDClient()
     try:
         if args.verbose:
@@ -91,13 +165,19 @@ def main():
             mpd_instance.disconnect()
         atexit.register(lambda: disconnect(m,args))
         
-        artists   = m.list('Artist')
-        fill_random(m,artists,args)
-
+        baselist = init_baselist(m,args)
+        modemap[args.mode](m,baselist,args)
+        
         subsystem = []
         while True:
+            #if args.verbose:
+            #    print 'state changed:', subsystem
+            if 'update' in subsystem:
+                status = m.status()
+                if not status.has_key('updating_db'):
+                    baselist = init_baselist(m,args)
             if 'player' in subsystem:
-                modemap[args.mode](m,artists,args)
+                modemap[args.mode](m,baselist,args)
             subsystem = m.idle()
             
     except socket.error, e:
