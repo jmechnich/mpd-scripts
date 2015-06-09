@@ -23,6 +23,11 @@ def filter_track(track,args):
                     break
     return rejected
 
+def track_in_playlist(mpd_instance, uri):
+    if "file: %s" % uri in mpd_instance.playlist():
+        return True
+    return False
+
 def add_random_track(mpd_instance, files, args):
     while len(files):
         fileentry = random.choice(files)
@@ -30,6 +35,8 @@ def add_random_track(mpd_instance, files, args):
         track     = mpd_instance.listallinfo(uri)[0]
         files.remove(fileentry)
         if filter_track(track,args):
+            continue
+        if track_in_playlist(mpd_instance,uri):
             continue
         if args.verbose:
             print "add_random_track: '%s - %s'" % (
@@ -56,6 +63,8 @@ def add_random_track_from_artists(mpd_instance, artists, args):
         tracks = mpd_instance.find('Artist', random.choice(artists))
         track  = random.choice(tracks)
         if filter_track(track,args):
+            continue
+        if track_in_playlist(mpd_instance,track['file']):
             continue
         if args.verbose:
             print "add_random_track_from_artists: '%s - %s'" % (
