@@ -7,6 +7,8 @@
 
 set -e
 
+parallel=1
+
 checkprog ()
 {
     if which $1 > /dev/null 2>&1; then
@@ -39,10 +41,13 @@ process ()
         return
     fi
     echo "Processing `wc -l < $filelist` $filetype album(s)"
-    #while read album; do
-    #    process_album "$filetype" "$album" "$cmd" $@
-    #done < "$filelist"
-    parallel --no-notice --eta -a "$filelist"  process_album "$filetype" "{}" "$cmd" $@
+    if [ $parallel -eq 1 ]; then
+        parallel --no-notice --eta -a "$filelist"  process_album "$filetype" "{}" "$cmd" $@
+    else
+        while read album; do
+            process_album "$filetype" "$album" "$cmd" $@
+        done < "$filelist"
+    fi
 }
 
 AACGAIN=`checkprog aacgain`
