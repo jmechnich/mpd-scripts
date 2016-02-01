@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import argparse, atexit, audioscrobbler, mpd, random, re, socket, urllib
+from mpd_scripts import audioscrobbler
+import argparse, atexit, mpd, random, re, socket, urllib, sys, os
 
 def songs_remaining(mpd_instance):
     status    = mpd_instance.status()
@@ -122,10 +123,10 @@ def init_baselist(mpd_instance, args):
         print "init_baselist:",
     if args.mode == 'random':
         ret = [ f for f in mpd_instance.listall() if f.has_key('file') ]
-        print "found", len(ret), "files"
+        print "Found", len(ret), "files"
     else:
         ret = mpd_instance.list('Artist')
-        print "found", len(ret), "artists"
+        print "Found", len(ret), "artists"
     return ret
 
 def main():
@@ -161,7 +162,34 @@ Available operation modes are:
         help="reject song candidates by tag-regex matching. Can be given multiple times. Format: TAG,REGEX (e.g. 'genre,Audiobook')")
     parser.add_argument(
         '-v', '--verbose', help='verbose output', action="store_true")
+
     args = parser.parse_args()
+    # Look for configuration file
+    cmdargs = sys.argv[1:]
+    configfile = os.path.join( os.path.expanduser('~'), '.mpd_dynamic')
+    try:
+        with open(configfile) as f:
+            if args.verbose:
+                print "Reading configuration file", configfile
+            for line in f.readlines():
+                line = line.strip()
+                if len(line) == 0 or line.startswith('#'): continue
+                arg = [ a.strip() for a in line.split('=') ]
+                if len(arg) != 2:
+                    print "Error parsing command line argument from configfile:", line
+                    continue
+                if args.verbose:
+                    print "Adding option from configuration file:",
+                    print ('--' + arg[0]), arg[1]
+                cmdargs.append('--' + arg[0])
+                cmdargs.append(arg[1])
+    except IOError, e:
+        pass
+    print cmdargs
+    
+    parser.parse_args(cmdargs,namespace=args)
+    if args.verbose:
+        print "Command line:", args
     m = mpd.MPDClient()
     try:
         if args.verbose:
@@ -189,10 +217,16 @@ Available operation modes are:
                 modemap[args.mode](m,baselist,args)
             subsystem = m.idle()
             
+    except mpd.ConnectionError, e:
+        if args.verbose:
+            print "main:",
+        print e
+        sys.exit(1)
     except socket.error, e:
         if args.verbose:
             print "main:",
         print e
+        sys.exit(1)
     except KeyboardInterrupt:
         pass
     
