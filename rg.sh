@@ -65,9 +65,9 @@ if [ x"$METAFLAC" = x ]; then
     echo "metaflac not found"
     exit 1
 fi
-MP3GAIN=`checkprog mp3gain.py`
+MP3GAIN=`checkprog mp3gain`
 if [ x"$MP3GAIN" = x ]; then
-    echo "mp3gain.py not found"
+    echo "mp3gain not found"
     exit 1
 fi
 MPCGAIN=`checkprog mpcgain`
