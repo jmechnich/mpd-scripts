@@ -15,20 +15,23 @@ NCONN=-1
 while true; do
     NH=`nhttpd`
     [ $DEBUG -eq 1 -a $NCONN -ne $NH ] && echo "$NH active httpd connections"
-    if mpc | grep -q '^\[playing\]'; then
+    STATUS=`mpc 2>/dev/null`
+    #if echo "$STATUS" | grep -q '^\[stopped\]'; then
+    #    mpc play
+    #    mpc pause
+    #fi
+    curstate=0
+    if echo "$STATUS" | grep -q '^\[playing\]'; then
         curstate=1
-    else
-        curstate=0
     fi
     if [ $NH -eq 0 -a $curstate -eq 1 ]; then
-        [ $DEBUG -eq 1 ] && echo "No httpd connection and running"
         if [ `nctrl` -eq 0 ]; then
             [ $DEBUG -eq 1 ] && echo "No control connection, pausing"
-            mpc -q pause
+            mpc -q pause 2>/dev/null
         fi
     elif [ $NH -ne 0 -a $curstate -eq 0 ]; then
         [ $DEBUG -eq 1 ] && echo "httpd connection, starting playback"
-        mpc -q play
+        mpc -q play 2>/dev/null
     fi
     NCONN=$NH
     sleep 5

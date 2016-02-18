@@ -190,7 +190,6 @@ Available operation modes are:
                 cmdargs.append(arg[1])
     except IOError, e:
         pass
-    print cmdargs
     
     parser.parse_args(cmdargs,namespace=args)
     if args.verbose:
@@ -245,12 +244,14 @@ Available operation modes are:
         except mpd.ConnectionError, e:
             if args.verbose:
                 print "main: MPD:",
-            print e
+            if reconnects != -1 or args.verbose:
+                print e
             reconnects = reconnect(reconnects,m,args)
         except socket.error, e:
             if args.verbose:
                 print "main:",
-            print e
+            if reconnects != -1 or args.verbose:
+                print e
             reconnects = reconnect(reconnects,m,args)
         except KeyboardInterrupt:
             break
