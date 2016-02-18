@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from mpd_scripts import audioscrobbler
-import argparse, atexit, mpd, random, re, socket, urllib, sys, os
+import argparse, atexit, mpd, random, re, socket, urllib, sys, os, time
 
 def songs_remaining(mpd_instance):
     status    = mpd_instance.status()
@@ -117,7 +117,7 @@ def fill_similar(mpd_instance, artists, args):
     add_random_track_from_artists(mpd_instance,similar_artists,args)
 
 fill_similar.last = ''
-    
+
 def init_baselist(mpd_instance, args):
     if args.verbose:
         print "init_baselist:",
@@ -129,11 +129,13 @@ def init_baselist(mpd_instance, args):
         print "Found", len(ret), "artists"
     return ret
 
+
 def main():
     modemap = { 'random':  fill_random,
                 'random2': fill_random_from_artists,
                 'similar': fill_similar
     }
+
     parser = argparse.ArgumentParser(
         prog='mpd_dynamic',
         description="mpd_dynamic - fill playlist dynamically",
@@ -160,6 +162,9 @@ Available operation modes are:
     parser.add_argument(
         '-f', '--filter', type=str, action='append',
         help="reject song candidates by tag-regex matching. Can be given multiple times. Format: TAG,REGEX (e.g. 'genre,Audiobook')")
+    parser.add_argument(
+        '-r', '--reconnect', type=int, default=0,
+        help='number of reconnection attempts (-1 = infinite, default: %(default)s)')
     parser.add_argument(
         '-v', '--verbose', help='verbose output', action="store_true")
 
@@ -190,45 +195,65 @@ Available operation modes are:
     parser.parse_args(cmdargs,namespace=args)
     if args.verbose:
         print "Command line:", args
+    
     m = mpd.MPDClient()
-    try:
+
+    def disconnect(mpd_instance, args):
         if args.verbose:
-            print "main: connecting to %s:%d" % (args.host,args.port)
-        m.connect(args.host, args.port)
-        
-        def disconnect(mpd_instance, args):
-            if args.verbose:
-                print "main: disconnecting"
+            print "main: disconnecting"
+        try:
             mpd_instance.disconnect()
-        atexit.register(lambda: disconnect(m,args))
+        except mpd.ConnectionError:
+            pass
+    atexit.register(lambda: disconnect(m,args))
+
+    reconnects = args.reconnect
+    def reconnect(reconnects,mpd_instance,args):
+        if reconnects == 0:
+            sys.exit(1)
+        else:
+            disconnect(mpd_instance,args)
+            if reconnects > 0:
+                reconnects -= 1
+            if args.verbose:
+                print "main: trying to reconnect,", reconnects, "attempts left"
+            time.sleep(3)
+        return reconnects
         
-        baselist = init_baselist(m,args)
-        modemap[args.mode](m,baselist,args)
-        
-        subsystem = []
-        while True:
-            #if args.verbose:
-            #    print 'state changed:', subsystem
-            if 'update' in subsystem:
-                status = m.status()
-                if not status.has_key('updating_db'):
-                    baselist = init_baselist(m,args)
-            if 'player' in subsystem:
-                modemap[args.mode](m,baselist,args)
-            subsystem = m.idle()
+    while True:
+        try:
+            if args.verbose:
+                print "main: connecting to %s:%d" % (args.host,args.port)
+            m.connect(args.host, args.port)
+            reconnects = args.reconnect
             
-    except mpd.ConnectionError, e:
-        if args.verbose:
-            print "main:",
-        print e
-        sys.exit(1)
-    except socket.error, e:
-        if args.verbose:
-            print "main:",
-        print e
-        sys.exit(1)
-    except KeyboardInterrupt:
-        pass
+            baselist = init_baselist(m,args)
+            modemap[args.mode](m,baselist,args)
+            
+            subsystem = []
+            while True:
+                #if args.verbose:
+                #    print 'state changed:', subsystem
+                if 'update' in subsystem:
+                    status = m.status()
+                    if not status.has_key('updating_db'):
+                        baselist = init_baselist(m,args)
+                if 'player' in subsystem:
+                    modemap[args.mode](m,baselist,args)
+                subsystem = m.idle()
+                
+        except mpd.ConnectionError, e:
+            if args.verbose:
+                print "main: MPD:",
+            print e
+            reconnects = reconnect(reconnects,m,args)
+        except socket.error, e:
+            if args.verbose:
+                print "main:",
+            print e
+            reconnects = reconnect(reconnects,m,args)
+        except KeyboardInterrupt:
+            break
     
 if __name__ == "__main__":
     main()
