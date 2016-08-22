@@ -147,7 +147,7 @@ Available operation modes are:
         'port', type=int, nargs="?", default=6600,
         help='port of MPD server (default: %(default)s)')
     parser.add_argument(
-        '-l', '--length', type=int, default=20,
+        '-l', '--length', type=int, default=20, metavar='N',
         help='number of remaining songs (default: %(default)s)')
     parser.add_argument(
         '-m', '--mode', choices=sorted(modemap.keys()), default='random',
@@ -155,6 +155,9 @@ Available operation modes are:
     parser.add_argument(
         '-f', '--filter', type=str, action='append',
         help="reject song candidates by tag-regex matching. Can be given multiple times. Format: TAG,REGEX (e.g. 'genre,Audiobook')")
+    parser.add_argument(
+        '-p', '--poll-interval', type=int, default=-1, metavar='N',
+        help="poll mpd at least every N seconds. Setting to -1 disables polling (default)")
     parser.add_argument(
         '-r', '--reconnect', type=int, default=0,
         help='number of reconnection attempts (-1 = infinite, default: %(default)s)')
@@ -223,13 +226,19 @@ Available operation modes are:
 
             # MPD idle status loop
             subsystem = []
+            last = now = time.time()
             while True:
                 if 'update' in subsystem or len(baselist) == 0:
                     status = m.status()
                     if not status.has_key('updating_db') or len(baselist) == 0:
                         baselist = init_baselist(m,args)
-                if 'player' in subsystem:
+                if args.poll_interval > 0:
+                    now = time.time()
+                if 'player' in subsystem or (args.poll_interval > 0 and
+                                             (now-last) > args.poll_interval) :
                     modemap[args.mode](m,baselist,args)
+                    if args.poll_interval > 0:
+                        last = now
                 subsystem = m.idle()
                 
         except mpd.ConnectionError, e:
