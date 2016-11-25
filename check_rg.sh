@@ -6,7 +6,7 @@
 #             tracks_[mp3|m4a|ogg|mpc|flac].txt
 
 # use GNU parallel if set to 1
-parallel=0
+parallel=1
     
 if [ $# != 1 ]; then
     echo "Usage: check_rg.sh tracklistfile"

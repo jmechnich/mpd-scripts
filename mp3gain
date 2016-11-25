@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import os, sys, subprocess
-import eyeD3
+import eyed3
 
 # preserve file modification times ?
 preserve_mtime = True
@@ -26,8 +26,8 @@ for line in pipe:
    parts = line.rstrip("\n").split("\t")
    if parts[0] == '"Album"':
       albumframes = {
-            "replaygain_album_gain": "%.2f dB" % (float(parts[2])),
-            "replaygain_album_peak": "%.6f"    % (float(parts[3])/32768.),
+            u"replaygain_album_gain": u"%.2f dB" % (float(parts[2])),
+            u"replaygain_album_peak": u"%.6f"    % (float(parts[3])/32768.),
          }
    else:
       trackinfo.append(parts)
@@ -42,21 +42,12 @@ for entry in trackinfo:
       print filename
       continue
    trackframes = {
-      "replaygain_track_gain": "%.2f dB" % (float( entry[2])),
-      "replaygain_track_peak": "%.6f"    % (float( entry[3])/32768.),
+      u"replaygain_track_gain": u"%.2f dB" % (float( entry[2])),
+      u"replaygain_track_peak": u"%.6f"    % (float( entry[3])/32768.),
    }
    if len(trackinfo) > 1:
       trackframes.update(albumframes)
-   tag = eyeD3.Tag()
-   tag.link(filename)
+   mp3file = eyed3.load(filename)
    for key, value in trackframes.iteritems():
-      changed = False
-      for frame in tag.getUserTextFrames():
-         if frame.description == key:
-            frame.text = value
-            changed = True
-      if not changed:
-         tag.addUserTextFrame(key,value)
-   tag.update()
-   if preserve_mtime:
-      os.utime(filename, (stat.st_atime, stat.st_mtime))
+      mp3file.tag.user_text_frames.set(text=value,description=key)
+   mp3file.tag.save(preserve_file_time=preserve_mtime)
