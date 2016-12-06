@@ -1,0 +1,13 @@
+[Unit]
+Description=HTTP connection monitor for mpd
+After=mpd.service
+Requires=mpd.service
+
+[Service]
+ExecStart=/usr/local/bin/mpd_watch 
+User=mpd
+Group=audio
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target

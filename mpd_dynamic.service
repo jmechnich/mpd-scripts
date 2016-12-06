@@ -1,0 +1,13 @@
+[Unit]
+Description=Dynamic playlist generator for mpd
+After=mpd.service
+Requires=mpd.service
+
+[Service]
+ExecStart=/usr/local/bin/mpd_dynamic 
+User=mpd
+Group=audio
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target

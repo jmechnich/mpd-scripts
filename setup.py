@@ -9,5 +9,7 @@ setup(name='mpd-scripts',
       author_email='joerg.mechnich@gmail.com',
       url='https://github.com/jmechnich/mpd-scripts',
       packages=['mpd_scripts'],
-      scripts=['mpd_dynamic', 'mpd_watch', 'mp3gain']
+      scripts=['mpd_dynamic', 'mpd_watch', 'mp3gain'],
+      data_files=[('/etc/systemd/system',
+                   ['mpd_dynamic.service', 'mpd_watch.service'])],
      )
