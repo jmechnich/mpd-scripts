@@ -41,8 +41,8 @@ process_track ()
         return
     fi
     
-    tr_count=`$cmd "$track" |& grep -aic REPLAYGAIN_TRACK`
-    al_count=`$cmd "$track" |& grep -aic REPLAYGAIN_ALBUM`
+    tr_count=`$cmd "$track" |& grep -aic 'REPLAYGAIN_TRACK\|\(track \(gain\|peak\)\)'`
+    al_count=`$cmd "$track" |& grep -aic 'REPLAYGAIN_ALBUM\|\(album \(gain\|peak\)\)'`
     if [ $tr_count -lt 2 ] || [ $al_count -lt 2 ]; then
         if ! $cmd "$track" |& grep -q 'track *: 1/1'; then
             echo "$track missing RG info: a $al_count t $tr_count"
@@ -88,7 +88,7 @@ case $FILETYPE in
         process "$LISTFILE" ffprobe
         ;;
     mpc)
-        process "$LISTFILE" ffprobe
+        process "$LISTFILE" mpcdec -i
         ;;
     ogg)
         process "$LISTFILE" ffprobe
