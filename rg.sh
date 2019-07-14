@@ -9,15 +9,26 @@
 parallel=1
 
 if [ $# != 1 ]; then
-    echo "Usage: rg.sh albumlistfile"
+    echo "Usage: rg.sh albumlistfile | directory"
     exit 1
 fi
 
-LISTFILE="$1"
+ARG="$1"
 shift
-if ! [ -e "$LISTFILE" ]; then
-    echo "$LISTFILE not found"
+if ! [ -e "$ARG" ]; then
+    echo "$ARG not found"
     exit 1
+fi
+
+DEL_LISTFILE=0
+if [ -f "$ARG" ]; then
+    LISTFILE="$ARG"
+    FILETYPE=`basename "$LISTFILE" | sed 's,albums_\([^\.]*\)\.txt,\1,'`
+elif [ -d "$ARG" ]; then
+    FILETYPE=`find "$ARG" | grep -m1 -E -o 'mp3$|m4a$|ogg$|flac$|mpc$'`
+    LISTFILE=`tempfile`
+    echo "$ARG" > $LISTFILE
+    DEL_LISTFILE=1
 fi
 
 checkprog ()
@@ -68,7 +79,6 @@ process ()
     fi
 }
 
-FILETYPE=`basename "$LISTFILE" | sed 's,albums_\([^\.]*\)\.txt,\1,'`
 echo "Filetype: $FILETYPE"
 
 case $FILETYPE in
@@ -92,3 +102,7 @@ case $FILETYPE in
         exit 1
         ;;
 esac
+
+if [ $DEL_LISTFILE -eq 1 ]; then
+    rm -rf $LISTFILE
+fi
