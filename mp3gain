@@ -23,7 +23,13 @@ pipe.readline()
 # parse output
 trackinfo = []
 for line in pipe:
-   filename, _, gain, peak, _, _ = line.decode('utf-8').rstrip().split('\t')
+   try:
+      filename, _, gain, peak, _, _ = line.decode('utf-8').rstrip().split('\t')
+   except ValueError as e:
+      print(e)
+      print(line.decode('utf-8'))
+      sys.exit(1)
+
    gain = float(gain)
    peak = float(peak)/32768.
    if filename == '"Album"':
