@@ -1,6 +1,5 @@
 #!/usr/bin/python3 -u
 
-from mpd_scripts import audioscrobbler
 import argparse, atexit, mpd, random, re, socket, urllib.parse, sys, os, time
 
 def songs_remaining(mpd_instance):
@@ -97,18 +96,27 @@ def fill_similar(mpd_instance, artists, args):
 
     if args.verbose:
         print("fill_similar: querying similar artists for '%s'" % current['artist'])
-    cloud = audioscrobbler.AudioScrobblerQuery(
-        artist = urllib.parse.quote_plus(current['artist']))
-    similar_cloud = [ str(artist.name).decode('utf-8')
-                      for artist in cloud.similar() ]
-    if len(similar_cloud) == 0:
+
+    if len(args.apikey):
+        minmatch = max(min(args.minmatch, 1), 0)
+        if args.verbose:
+            print("fill_similar: using pylast module, minimum match value %.4f" % minmatch)
+
+        import pylast
+        network = pylast.LastFMNetwork(api_key=args.apikey)
+        artist = network.get_artist(current['artist'])
+        similar_lastfm = [ item.get_name() for item, match in artist.get_similar() if match > minmatch ]
+    else:
+        similar_lastfm = []
+
+    if len(similar_lastfm) == 0:
         add_random_track_from_artists(mpd_instance,artists,args)
         return
     
-    similar_artists = list(set(similar_cloud).intersection(artists))
+    similar_artists = list(set(similar_lastfm).intersection(artists))
     if args.verbose:
         print("fill_similar: %d/%d similar artists found" % (
-            len(similar_artists), len(similar_cloud)))
+            len(similar_artists), len(similar_lastfm)))
     if len(similar_artists) == 0:
         add_random_track_from_artists(mpd_instance,artists,args)
         return
@@ -151,6 +159,12 @@ Available operation modes are:
     parser.add_argument(
         'port', type=int, nargs="?", default=6600,
         help='port of MPD server (default: %(default)s)')
+    parser.add_argument(
+        '--apikey', type=str, default='',
+        help='last.fm API key (default: %(default)s)')
+    parser.add_argument(
+        '--minmatch', type=float, default=0.,
+        help='minimum match value for similar artists (default: %(default)f)')
     parser.add_argument(
         '-l', '--length', type=int, default=20, metavar='N',
         help='number of remaining songs (default: %(default)s)')

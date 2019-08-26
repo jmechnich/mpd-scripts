@@ -9,6 +9,6 @@ A collection of scripts related to the Music Player Daemon.
 - mp3gain: add ReplayGain tags to mp3 files
 - rg.sh: add ReplayGain tags to mp3/m4a/ogg/mpc/flac files
 
-## Credits
+## Dependencies
 
-- audioscrobbler.py stolen from https://github.com/offmessage/pyscrobbler
+- python3-pylast for retrieval of similar artists from last.fm
