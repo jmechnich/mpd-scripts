@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Exec=mpd_dynamic
+Terminal=false
+Hidden=false
+X-GNOME-Autostart-enabled=true
+Name=Dynamic MPD playlist update
