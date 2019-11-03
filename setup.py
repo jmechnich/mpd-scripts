@@ -1,15 +1,21 @@
-#!/usr/bin/python3 -u
+#!/usr/bin/env python3
 
-from distutils.core import setup
+import sys
+if sys.version_info < (3,4):
+    print("Requires python 3.4 or later")
+    sys.exit(1)
 
-setup(name='mpd-scripts',
-      version='1.0',
-      description='',
-      author='Joerg Mechnich',
-      author_email='joerg.mechnich@gmail.com',
-      url='https://github.com/jmechnich/mpd-scripts',
-      packages=['mpd_scripts'],
-      scripts=['mpd_dynamic', 'mpd_watch', 'mp3gain'],
-      data_files=[('/etc/systemd/system',
-                   ['mpd_dynamic.service', 'mpd_watch.service'])],
-     )
+from setuptools import setup
+setup(
+    name='mpd-scripts',
+    version='1.0',
+    description='',
+    url='https://github.com/jmechnich/mpd-scripts',
+    author='Joerg Mechnich',
+    author_email='joerg.mechnich@gmail.com',
+    license='MIT',
+    packages=['mpd_scripts'],
+    scripts=['mpd_dynamic', 'mpd_watch', 'mp3gain'],
+    data_files=[('/etc/systemd/system',
+                 ['mpd_dynamic.service', 'mpd_watch.service'])],
+)

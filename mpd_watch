@@ -11,6 +11,9 @@ nctrl () {
     echo $(($N-$V))
 }
 
+mpc -q play 2>/dev/null
+sleep 5
+
 NCONN=-1
 while true; do
     NH=`nhttpd`
