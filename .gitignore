@@ -3,4 +3,6 @@
 *.txt
 \#*
 .#*
-/build
+/build/
+/dist/
+/mpd_scripts.egg-info/
