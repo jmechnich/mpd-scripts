@@ -14,8 +14,8 @@ setup(
     author='Joerg Mechnich',
     author_email='joerg.mechnich@gmail.com',
     license='MIT',
-    packages=['mpd_scripts'],
     scripts=['mpd_dynamic', 'mpd_watch', 'mp3gain'],
     data_files=[('/etc/systemd/system',
                  ['mpd_dynamic.service', 'mpd_watch.service'])],
+#    install_requires=["eyed3", "mpd"],
 )
