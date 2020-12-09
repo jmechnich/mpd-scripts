@@ -6,3 +6,4 @@
 /build/
 /dist/
 /mpd_scripts.egg-info/
+/.eggs
