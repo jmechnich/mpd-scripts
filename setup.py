@@ -14,9 +14,12 @@ setup(
     long_description_content_type="text/markdown",
     url='https://github.com/jmechnich/mpd-scripts',
     license='MIT',
-    scripts=['mpd_dynamic', 'mpd_watch', 'mp3gain'],
     use_scm_version={"local_scheme": "no-local-version"},
     setup_requires=['setuptools_scm'],
     install_requires=["python-mpd2", "eyeD3"],
+    scripts=['mpd_dynamic', 'mpd_watch', 'mp3gain'],
+    data_files = [
+        ('share/applications', ['mpd_dynamic.desktop']),
+    ],
     python_requires='>=3.6',
 )
