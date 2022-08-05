@@ -1,10 +1,19 @@
-#!/usr/bin/python3 -u
+#!/usr/bin/env python3
 
-import os, sys, subprocess
+import os
+import shutil
+import subprocess
+import sys
+
 import eyed3
 
 # preserve file modification times ?
 preserve_mtime = True
+
+aacgain = shutil.which("aacgain")
+if aacgain is None:
+   print("Could not find aacgain executable")
+   sys.exit(1)
 
 # only accept mp3 files as m4a do not use id3 tags
 filelist = sys.argv[1:]
@@ -14,7 +23,7 @@ for f in filelist:
       sys.exit(1)
 
 # aacgain supports mp3 and m4a with AAC-LC (no Apple Lossless / ALAC)
-cmd = "aacgain -o -s s -q".split() + filelist
+cmd = f"{aacgain} -o -s s -q".split() + filelist
 pipe = subprocess.Popen(cmd, stdout=subprocess.PIPE).stdout
 
 # skip first line of output (header)

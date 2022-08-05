@@ -1,4 +1,4 @@
-#!/usr/bin/python3 -u
+#!/usr/bin/env python3
 
 # create file list first
 # find $TOPDIR -type f -name \*.m4a | while read i; do (ffprobe "$i" |& grep -q alac) && echo "$i"; done > filelist.txt

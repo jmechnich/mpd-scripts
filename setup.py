@@ -19,7 +19,7 @@ setup(
     install_requires=["python-mpd2", "eyeD3"],
     scripts=['mpd_dynamic', 'mpd_watch', 'mp3gain'],
     data_files = [
-        ('share/applications', ['mpd_dynamic.desktop']),
+        ('share/applications', ['misc/mpd_dynamic.desktop']),
     ],
     python_requires='>=3.6',
 )
