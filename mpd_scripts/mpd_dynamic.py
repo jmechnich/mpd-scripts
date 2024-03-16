@@ -1,0 +1,278 @@
+#!/usr/bin/python3 -u
+
+import argparse, atexit, mpd, random, re, socket, urllib.parse, sys, os, time
+
+def songs_remaining(mpd_instance):
+    status    = mpd_instance.status()
+    pl_length = int(status['playlistlength'])
+    song      = int(status.get('song',0))
+    return (pl_length - song)
+
+def filter_track(track,args):
+    rejected = False
+    if args.filter:
+        for f in args.filter:
+            sep   = f.find(',')
+            tag   = f[:sep]
+            regex = f[sep+1:]
+            if tag in track and re.match(track[tag],regex):
+                rejected = True
+                if args.verbose:
+                    print(
+                        "filter_track:",
+                        "'%s - %s' rejected by filter '%s'" % (
+                            track['artist'], track['title'], f)
+                    )
+                break
+    return rejected
+
+def track_in_playlist(mpd_instance, uri):
+    if "file: %s" % uri in mpd_instance.playlist():
+        return True
+    return False
+
+def add_random_track(mpd_instance, files, args):
+    while len(files):
+        fileentry = random.choice(files)
+        uri       = fileentry['file']
+        track     = mpd_instance.listallinfo(uri)[0]
+        files.remove(fileentry)
+        if filter_track(track,args):
+            continue
+        if track_in_playlist(mpd_instance,uri):
+            continue
+        if args.verbose:
+            print("add_random_track: '%s - %s'" % (
+                track['artist'], track['title']))
+            print("add_random_track: %d songs left" % len(files))
+        mpd_instance.add(uri)
+        break
+    else:
+        if args.verbose:  print("add_random_track: no songs left")
+
+def fill_random(mpd_instance, files, args):
+    add = args.length - songs_remaining(mpd_instance)
+    if add > 0:
+        if args.verbose:  print("fill_random: adding", add, "random tracks")
+        for i in range(add):
+            add_random_track(mpd_instance,files,args)
+    else:
+        if args.verbose:  print("fill_random: nothing to do")
+    
+def add_random_track_from_artists(mpd_instance, artists, args):
+    while range(10):
+        tracks = mpd_instance.find('Artist', random.choice(artists))
+        track  = random.choice(tracks)
+        if filter_track(track,args):
+            continue
+        if track_in_playlist(mpd_instance,track['file']):
+            continue
+        if args.verbose:  print("add_random_track_from_artists: '%s - %s'" % (
+                track['artist'], track['title']))
+        mpd_instance.add(track['file'])
+        break
+    else:
+        if args.verbose:
+            print("add_random_track_from_artists: max retries reached")
+
+def fill_random_from_artists(mpd_instance, artists, args):
+    add = args.length - songs_remaining(mpd_instance)
+    if add > 0:
+        if args.verbose:
+            print("fill_random_from_artists: adding", add, "random tracks")
+        for i in range(add):
+            add_random_track_from_artists(mpd_instance,artists,args)
+    else:
+        if args.verbose:
+            print("fill_random_from_artists: nothing to do")
+
+def fill_similar(mpd_instance, artists, args):
+    current = mpd_instance.currentsong()
+    if not len(current):
+        return
+    if fill_similar.last == current['artist']:
+        return
+    fill_similar.last = current['artist']
+
+    if args.verbose:
+        print("fill_similar: querying similar artists for '%s'" % current['artist'])
+
+    if len(args.apikey):
+        minmatch = max(min(args.minmatch, 1), 0)
+        if args.verbose:
+            print("fill_similar: using pylast module, minimum match value %.4f" % minmatch)
+
+        import pylast
+        network = pylast.LastFMNetwork(api_key=args.apikey)
+        artist = network.get_artist(current['artist'])
+        similar_lastfm = [ item.get_name() for item, match in artist.get_similar() if match > minmatch ]
+    else:
+        similar_lastfm = []
+
+    if len(similar_lastfm) == 0:
+        add_random_track_from_artists(mpd_instance,artists,args)
+        return
+    
+    similar_artists = list(set(similar_lastfm).intersection(artists))
+    if args.verbose:
+        print("fill_similar: %d/%d similar artists found" % (
+            len(similar_artists), len(similar_lastfm)))
+    if len(similar_artists) == 0:
+        add_random_track_from_artists(mpd_instance,artists,args)
+        return
+
+    add_random_track_from_artists(mpd_instance,similar_artists,args)
+
+fill_similar.last = ''
+
+def init_baselist(mpd_instance, args):
+    if args.verbose:  print("init_baselist:", end=' ')
+    if args.mode == 'random':
+        ret = [ f for f in mpd_instance.listall() if 'file' in f ]
+        if args.verbose:  print("Found", len(ret), "files")
+    else:
+        ret = mpd_instance.list('Artist')
+        if args.verbose:  print("Found", len(ret), "artists")
+    return ret
+
+
+def main():
+    modemap = { 'random':  fill_random,
+                'random2': fill_random_from_artists,
+                'similar': fill_similar
+    }
+
+    parser = argparse.ArgumentParser(
+        prog='mpd_dynamic',
+        description="mpd_dynamic - fill playlist dynamically",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Available operation modes are:
+  - random: real random playback, randomly selects track from all available files and removes it from list
+  - random2: pseudo-random playback, randomly selects an artist, then a random track by this artist
+  - similar: finds similar artists on last.fm and adds a random song by one of them
+""",
+    )
+    parser.add_argument(
+        'host', type=str, nargs="?", default='localhost',
+        help='hostname of MPD server (default: %(default)s)')
+    parser.add_argument(
+        'port', type=int, nargs="?", default=6600,
+        help='port of MPD server (default: %(default)s)')
+    parser.add_argument(
+        '--apikey', type=str, default='',
+        help='last.fm API key (default: %(default)s)')
+    parser.add_argument(
+        '--minmatch', type=float, default=0.,
+        help='minimum match value for similar artists (default: %(default)f)')
+    parser.add_argument(
+        '-l', '--length', type=int, default=20, metavar='N',
+        help='number of remaining songs (default: %(default)s)')
+    parser.add_argument(
+        '-m', '--mode', choices=sorted(modemap.keys()), default='random',
+        help="operation mode (default: %(default)s)")
+    parser.add_argument(
+        '-f', '--filter', type=str, action='append',
+        help="reject song candidates by tag-regex matching. Can be given multiple times. Format: TAG,REGEX (e.g. 'genre,Audiobook')")
+    parser.add_argument(
+        '-p', '--poll-interval', type=int, default=-1, metavar='N',
+        help="poll mpd at least every N seconds. Setting to -1 disables polling (default)")
+    parser.add_argument(
+        '-r', '--reconnect', type=int, default=0,
+        help='number of reconnection attempts (-1 = infinite, default: %(default)s)')
+    parser.add_argument(
+        '-v', '--verbose', help='verbose output', action="store_true")
+
+    args = parser.parse_args()
+    # Look for configuration file
+    cmdargs = sys.argv[1:]
+    configfile = os.path.join( os.path.expanduser('~'), '.mpd_dynamic')
+    try:
+        with open(configfile) as f:
+            if args.verbose:
+                print("Reading configuration file", configfile)
+            for line in f.readlines():
+                line = line.strip()
+                if len(line) == 0 or line.startswith('#'): continue
+                arg = [ a.strip() for a in line.split('=') ]
+                if len(arg) != 2:
+                    print("Error parsing command line argument from configfile:", line)
+                    continue
+                if args.verbose:
+                    print("Adding option from configuration file:", end=" ")
+                    print(('--' + arg[0]), arg[1])
+                cmdargs.append('--' + arg[0])
+                cmdargs.append(arg[1])
+    except IOError:
+        pass
+    
+    parser.parse_args(cmdargs,namespace=args)
+    if args.verbose:
+        print("Command line:", args)
+    
+    m = mpd.MPDClient()
+
+    def disconnect(mpd_instance, args):
+        if args.verbose:
+            print("main: disconnecting")
+        try:
+            mpd_instance.disconnect()
+        except mpd.ConnectionError:
+            pass
+    atexit.register(lambda: disconnect(m,args))
+
+    reconnects = args.reconnect
+    def reconnect(reconnects,mpd_instance,args):
+        if reconnects == 0:
+            sys.exit(1)
+        else:
+            disconnect(mpd_instance,args)
+            if reconnects > 0:
+                reconnects -= 1
+            if args.verbose:
+                print("main: trying to reconnect,", reconnects, "attempts left")
+            time.sleep(3)
+        return reconnects
+
+    # MPD connection loop
+    while True:
+        try:
+            if args.verbose:
+                print("main: connecting to %s:%d" % (args.host,args.port))
+            m.connect(args.host, args.port)
+            reconnects = args.reconnect
+
+            # populate list of tracks and artists
+            baselist = init_baselist(m,args)
+            modemap[args.mode](m,baselist,args)
+
+            # MPD idle status loop
+            subsystem = []
+            last = now = time.time()
+            while True:
+                if 'update' in subsystem or len(baselist) == 0:
+                    status = m.status()
+                    if not 'updating_db' in status or len(baselist) == 0:
+                        baselist = init_baselist(m,args)
+                if args.poll_interval > 0:
+                    now = time.time()
+                if 'player' in subsystem or (args.poll_interval > 0 and
+                                             (now-last) > args.poll_interval) :
+                    modemap[args.mode](m,baselist,args)
+                    if args.poll_interval > 0:
+                        last = now
+                subsystem = m.idle()
+                
+        except mpd.ConnectionError as e:
+            if args.verbose:  print("main: MPD:", end=" ")
+            if reconnects != -1 or args.verbose:  print(e)
+            reconnects = reconnect(reconnects,m,args)
+        except socket.error as e:
+            if args.verbose:  print("main:", end=" ")
+            if reconnects != -1 or args.verbose:  print(e)
+            reconnects = reconnect(reconnects,m,args)
+        except KeyboardInterrupt:
+            break
+    
+if __name__ == "__main__":
+    main()

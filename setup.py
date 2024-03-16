@@ -17,7 +17,14 @@ setup(
     use_scm_version={"local_scheme": "no-local-version"},
     setup_requires=['setuptools_scm'],
     install_requires=["python-mpd2", "eyeD3"],
-    scripts=['mpd_dynamic', 'mpd_watch', 'mp3gain'],
+    packages=['mpd_scripts'],
+    entry_points={
+        'console_scripts': [
+            'mpd_dynamic = mpd_scripts.mpd_dynamic:main',
+            'mp3gain = mpd_scripts.mp3gain:main',
+            ]
+    },
+    scripts=['mpd_watch'],
     data_files = [
         ('share/applications', ['misc/mpd_dynamic.desktop']),
     ],
