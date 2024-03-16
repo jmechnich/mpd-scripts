@@ -8,13 +8,14 @@ A collection of scripts related to the Music Player Daemon.
 - m4a2flac: mass-convert ALAC to FLAC files using ffmpeg
 - mp3gain: add ReplayGain tags to mp3 files
 
-### Additional helper scripts
+### Additional files
 
-See `scripts` directory:
+See `util` directory:
 
 - check_rg.sh: check for ReplayGain tags in audio files
 - make_lists.sh: create lists of supported audio files found in given directories
 - rg.sh: add ReplayGain tags to mp3/m4a/ogg/mpc/flac files
+- org.jmechnich.mpd_dynamic.plist: LaunchAgent template for macOS. Substituting the proper path to the installed mpd_dynamic executable is required before using.
 
 ### Dependencies
 

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+   <key>Label</key>
+   <string>org.jmechnich.mpd_dynamic</string>
+   <key>Program</key>
+   <string>CHANGEME/bin/mpd_dynamic</string>
+   <key>KeepAlive</key>
+   <dict>
+     <key>OtherJobEnabled</key>
+     <dict>
+       <key>homebrew.mxcl.mpd</key>
+       <true/>
+     </dict>
+   </dict>
+</dict>
+</plist>
